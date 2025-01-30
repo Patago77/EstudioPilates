@@ -22,6 +22,7 @@
             width: 30%;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin: 10px;
+            cursor: pointer;
         }
         .dashboard .card h3 {
             font-size: 1.2rem;
@@ -34,12 +35,11 @@
     </style>
 </head>
 <body>
-    <header class="bg-primary text-white py-3">
-        <h1 class="text-center">Estudio de Pilates - Registro de Pagos</h1>
+    <header class="bg-primary text-white py-3 text-center">
+        <h1>Estudio de Pilates - Registro de Pagos</h1>
     </header>
 
     <main class="container my-5">
-        <!-- Contenedor de Inicio de Sesión -->
         <section id="loginContainer" aria-live="polite">
             <h2 class="text-center mb-4">Iniciar Sesión</h2>
             <form id="loginForm" aria-labelledby="loginTitle">
@@ -56,31 +56,28 @@
             </form>
         </section>
 
-        <!-- Contenedor de la Aplicación -->
         <section id="appContainer">
             <div class="text-end">
                 <button id="logoutButton" class="btn btn-danger">Cerrar Sesión</button>
             </div>
 
-            <!-- Dashboard Informativo -->
-            <section id="dashboardContainer" class="my-4">
-                <h2 class="text-center">Dashboard Informativo</h2>
+            <section id="dashboardContainer" class="my-4 text-center">
+                <h2>Dashboard Informativo</h2>
                 <div class="dashboard d-flex justify-content-around flex-wrap">
-                    <div id="overduePayments" class="card text-center p-3" style="cursor: pointer;">
+                    <div id="overduePayments" class="card">
                         <h3>Pagos Vencidos</h3>
                         <p id="overduePaymentsCount">0</p>
                     </div>
-                    <div id="upcomingPayments" class="card text-center p-3" style="cursor: pointer;">
+                    <div id="upcomingPayments" class="card">
                         <h3>Pagos Próximos a Vencer</h3>
                         <p id="upcomingPaymentsCount">0</p>
                     </div>
                 </div>
             </section>
 
-            <!-- Buscar Historial de Cliente -->
             <section id="clientPaymentsContainer">
                 <h3>Historial de Pagos</h3>
-                <form id="clientSearchFormUnique" class="mb-3"> <!-- Identificador único -->
+                <form id="clientSearchFormUnique" class="mb-3">
                     <input type="text" id="clientSearchInputUnique" name="clientSearch" class="form-control" placeholder="Nombre del cliente" required>
                     <button type="submit" class="btn btn-primary mt-2">Buscar</button>
                 </form>
@@ -95,13 +92,11 @@
                             </tr>
                         </thead>
                         <tbody id="clientPaymentsTableBody">
-                            <!-- Los datos se llenarán dinámicamente -->
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- Formulario de Registro -->
             <section class="mt-4">
                 <h3>Registrar Nuevo Pago</h3>
                 <form id="paymentForm">
@@ -132,7 +127,6 @@
         <p>Estudio de Pilates - © 2025</p>
     </footer>
 
- 
+    <script src="script.js"></script>
 </body>
-<script src="script.js"></script>
 </html>
