@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Pagos - Estudio de Pilates</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .table-responsive {
+            overflow-x: auto;
+        }
+        #appContainer {
+            display: none;
+        }
+        .dashboard .card {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            width: 30%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+        }
+        .dashboard .card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+        .dashboard .card p {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header class="bg-primary text-white py-3">
+        <h1 class="text-center">Estudio de Pilates - Registro de Pagos</h1>
+    </header>
+
+    <main class="container my-5">
+        <!-- Contenedor de Inicio de Sesión -->
+        <section id="loginContainer" aria-live="polite">
+            <h2 class="text-center mb-4">Iniciar Sesión</h2>
+            <form id="loginForm" aria-labelledby="loginTitle">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Usuario:</label>
+                    <input type="text" id="username" name="username" class="form-control" placeholder="Ingrese su usuario" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Contraseña:</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="Ingrese su contraseña" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+                <div id="loginError" class="text-danger mt-3" style="display: none;">⚠️ Usuario o contraseña incorrectos.</div>
+            </form>
+        </section>
+
+        <!-- Contenedor de la Aplicación -->
+        <section id="appContainer">
+            <div class="text-end">
+                <button id="logoutButton" class="btn btn-danger">Cerrar Sesión</button>
+            </div>
+
+            <!-- Dashboard Informativo -->
+            <section id="dashboardContainer" class="my-4">
+                <h2 class="text-center">Dashboard Informativo</h2>
+                <div class="dashboard d-flex justify-content-around flex-wrap">
+                    <div id="overduePayments" class="card text-center p-3" style="cursor: pointer;">
+                        <h3>Pagos Vencidos</h3>
+                        <p id="overduePaymentsCount">0</p>
+                    </div>
+                    <div id="upcomingPayments" class="card text-center p-3" style="cursor: pointer;">
+                        <h3>Pagos Próximos a Vencer</h3>
+                        <p id="upcomingPaymentsCount">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Buscar Historial de Cliente -->
+            <section id="clientPaymentsContainer">
+                <h3>Historial de Pagos</h3>
+                <form id="clientSearchFormUnique" class="mb-3"> <!-- Identificador único -->
+                    <input type="text" id="clientSearchInputUnique" name="clientSearch" class="form-control" placeholder="Nombre del cliente" required>
+                    <button type="submit" class="btn btn-primary mt-2">Buscar</button>
+                </form>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Fecha de Pago</th>
+                                <th>Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientPaymentsTableBody">
+                            <!-- Los datos se llenarán dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Formulario de Registro -->
+            <section class="mt-4">
+                <h3>Registrar Nuevo Pago</h3>
+                <form id="paymentForm">
+                    <div class="mb-3">
+                        <label for="fullName" class="form-label">Nombre y Apellido:</label>
+                        <input type="text" id="fullName" name="fullName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="subscriptionType" class="form-label">Tipo de Abono:</label>
+                        <select id="subscriptionType" name="subscriptionType" class="form-select" required>
+                            <option value="33500">Abono 1 - $33,500 (4 clases mensuales)</option>
+                            <option value="38500">Abono 2 - $38,500 (6 clases mensuales)</option>
+                            <option value="44000">Abono 3 - $44,000</option>
+                            <option value="8500">Clase Suelta - $8,500</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentDate" class="form-label">Fecha de Pago:</label>
+                        <input type="date" id="paymentDate" name="paymentDate" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" id="submitPayment">Registrar Pago</button>
+                </form>
+            </section>
+        </section>
+    </main>
+
+    <footer class="bg-light text-center py-3">
+        <p>Estudio de Pilates - © 2025</p>
+    </footer>
+
+ 
+</body>
+<script src="script.js"></script>
+</html>
