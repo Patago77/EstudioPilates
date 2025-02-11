@@ -7,12 +7,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        .table-responsive {
-            overflow-x: auto;
-        }
-        #appContainer {
-            display: none;
-        }
+        .table-responsive { overflow-x: auto; }
+        #appContainer { display: none; }
         .dashboard .card {
             background-color: #f9f9f9;
             border: 1px solid #ddd;
@@ -24,14 +20,8 @@
             margin: 10px;
             cursor: pointer;
         }
-        .dashboard .card h3 {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-        }
-        .dashboard .card p {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
+        .dashboard .card h3 { font-size: 1.2rem; margin-bottom: 10px; }
+        .dashboard .card p { font-size: 1.5rem; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -40,16 +30,16 @@
     </header>
 
     <main class="container my-5">
-        <section id="loginContainer" aria-live="polite">
+        <section id="loginContainer">
             <h2 class="text-center mb-4">Iniciar Sesión</h2>
-            <form id="loginForm" aria-labelledby="loginTitle">
+            <form id="loginForm">
                 <div class="mb-3">
                     <label for="username" class="form-label">Usuario:</label>
-                    <input type="text" id="username" name="username" class="form-control" placeholder="Ingrese su usuario" required>
+                    <input type="text" id="username" name="username" class="form-control" required>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Contraseña:</label>
-                    <input type="password" id="password" name="password" class="form-control" placeholder="Ingrese su contraseña" required>
+                    <input type="password" id="password" name="password" class="form-control" required>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Ingresar</button>
                 <div id="loginError" class="text-danger mt-3" style="display: none;">⚠️ Usuario o contraseña incorrectos.</div>
@@ -63,6 +53,25 @@
 
             <section id="dashboardContainer" class="my-4 text-center">
                 <h2>Dashboard Informativo</h2>
+
+                <div class="container mt-4">
+                    <h3>Total de Ingresos</h3>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Total de Pagos</th>
+                                <th>Total Ingresos ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td id="totalPayments">0</td>
+                                <td id="totalIncomeAmount" style="display: block;">$0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
                 <div class="dashboard d-flex justify-content-around flex-wrap">
                     <div id="overduePayments" class="card">
                         <h3>Pagos Vencidos</h3>
@@ -74,11 +83,28 @@
                     </div>
                 </div>
             </section>
+            <table id="paymentsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Fecha de Pago</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody id="clientPaymentsTableBody">
+                    <!-- Aquí se insertarán los pagos -->
+                  
+                    
+                </tbody>
+            </table>
+            
+            <span id="totalIncomeAmount">$0</span>
 
             <section id="clientPaymentsContainer">
                 <h3>Historial de Pagos</h3>
-                <form id="clientSearchFormUnique" class="mb-3">
-                    <input type="text" id="clientSearchInputUnique" name="clientSearch" class="form-control" placeholder="Nombre del cliente" required>
+                <form id="clientSearchForm" class="mb-3">
+                    <input type="text" id="clientSearchInput" class="form-control" placeholder="Nombre del cliente" required>
                     <button type="submit" class="btn btn-primary mt-2">Buscar</button>
                 </form>
                 <div class="table-responsive">
@@ -91,8 +117,7 @@
                                 <th>Monto</th>
                             </tr>
                         </thead>
-                        <tbody id="clientPaymentsTableBody">
-                        </tbody>
+                        <tbody id="clientPaymentsTableBody"></tbody>
                     </table>
                 </div>
             </section>
@@ -102,23 +127,29 @@
                 <form id="paymentForm">
                     <div class="mb-3">
                         <label for="fullName" class="form-label">Nombre y Apellido:</label>
-                        <input type="text" id="fullName" name="fullName" class="form-control" required>
+                        <input type="text" id="fullName" class="form-control" required>
                     </div>
+                
                     <div class="mb-3">
                         <label for="subscriptionType" class="form-label">Tipo de Abono:</label>
-                        <select id="subscriptionType" name="subscriptionType" class="form-select" required>
+                        <select id="subscriptionType" class="form-select" required>
                             <option value="33500">Abono 1 - $33,500 (4 clases mensuales)</option>
                             <option value="38500">Abono 2 - $38,500 (6 clases mensuales)</option>
                             <option value="44000">Abono 3 - $44,000</option>
                             <option value="8500">Clase Suelta - $8,500</option>
                         </select>
                     </div>
+                
                     <div class="mb-3">
                         <label for="paymentDate" class="form-label">Fecha de Pago:</label>
-                        <input type="date" id="paymentDate" name="paymentDate" class="form-control" required>
+                        <input type="date" id="paymentDate" class="form-control" required>
+
                     </div>
-                    <button type="submit" class="btn btn-primary w-100" id="submitPayment">Registrar Pago</button>
+                
+                    <button type="submit" class="btn btn-primary w-100">Registrar Pago</button>
                 </form>
+                
+                
             </section>
         </section>
     </main>

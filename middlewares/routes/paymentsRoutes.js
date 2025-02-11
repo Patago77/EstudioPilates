@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const sqlite3 = require('sqlite3').verbose();
-const authenticateToken = require('../authMiddleware'); // Middleware de autenticación
+const authenticateToken = require('../authMiddleware');
 
 const router = express.Router();
 const db = new sqlite3.Database('./payments.db');
@@ -43,6 +43,26 @@ router.post('/payments', authenticateToken, [
     );
 });
 
+// 📊 Obtener pagos por cliente
+router.get('/payments/client/:searchQuery', authenticateToken, (req, res) => {
+    const searchQuery = req.params.searchQuery;
+    console.log(`🔍 Buscando pagos para: ${searchQuery}`);
+    const sql = `SELECT rowid as id, fullName, subscriptionType, paymentDate FROM payments WHERE fullName LIKE ?`;
+    
+    db.all(sql, [`%${searchQuery}%`], (err, rows) => {
+        if (err) {
+            console.error('Error al buscar pagos:', err);
+            return res.status(500).json({ error: 'Error al buscar pagos' });
+        }
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'No se encontraron pagos para este cliente' });
+        }
+        res.json(rows);
+    });
+});
+
+
+
 // 📊 Obtener todos los pagos con búsqueda opcional
 router.get('/payments', authenticateToken, (req, res) => {
     const searchQuery = req.query.search || '';
@@ -63,6 +83,9 @@ router.get('/payments', authenticateToken, (req, res) => {
     });
 });
 
+
+
+
 // 📊 Obtener el total de ingresos
 router.get('/payments/total', authenticateToken, (req, res) => {
     db.get('SELECT SUM(subscriptionType) as totalIncome FROM payments', [], (err, row) => {
@@ -71,39 +94,6 @@ router.get('/payments/total', authenticateToken, (req, res) => {
             return res.status(500).json({ error: 'Error al calcular ingresos.' });
         }
         res.json({ totalIncome: row.totalIncome || 0 });
-    });
-});
-
-// 📊 Datos del Dashboard Informativo
-router.get('/dashboard', authenticateToken, (req, res) => {
-    const today = new Date().toISOString().split('T')[0]; // Fecha de hoy en formato ISO
-    const nextWeek = new Date();
-    nextWeek.setDate(new Date().getDate() + 7); // Fecha dentro de 7 días
-
-    const sql = `
-        SELECT
-            (SELECT SUM(subscriptionType) FROM payments) AS totalIncome,
-            (SELECT COUNT(*) FROM payments WHERE paymentDate < ?) AS overduePayments,
-            (SELECT COUNT(*) FROM payments WHERE paymentDate BETWEEN ? AND ?) AS upcomingPayments,
-            (SELECT json_group_array(json_object('id', rowid, 'fullName', fullName, 'paymentDate', paymentDate))
-             FROM payments WHERE paymentDate < ?) AS overdueList,
-            (SELECT json_group_array(json_object('id', rowid, 'fullName', fullName, 'paymentDate', paymentDate))
-             FROM payments WHERE paymentDate BETWEEN ? AND ?) AS upcomingList
-    `;
-
-    db.get(sql, [today, today, nextWeek.toISOString().split('T')[0], today, today, nextWeek.toISOString().split('T')[0]], (err, row) => {
-        if (err) {
-            console.error('Error al obtener datos del dashboard:', err);
-            return res.status(500).json({ error: 'Error al obtener datos del dashboard.' });
-        }
-
-        res.json({
-            totalIncome: row.totalIncome || 0,
-            overduePayments: row.overduePayments || 0,
-            upcomingPayments: row.upcomingPayments || 0,
-            overdueList: JSON.parse(row.overdueList || '[]'),
-            upcomingList: JSON.parse(row.upcomingList || '[]'),
-        });
     });
 });
 
