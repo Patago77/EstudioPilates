@@ -1,0 +1,5 @@
+node_modules/
+.env
+payments.db
+database.sqlite
+.package-lock.json
