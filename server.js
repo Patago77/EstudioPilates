@@ -25,13 +25,57 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // ✅ Base de Datos SQLite
-const db = new sqlite3.Database('./payments.db', (err) => {
+
+
+const db = new sqlite3.Database('./database.sqlite', (err) => {
     if (err) {
-        console.error('Error al conectar con la base de datos:', err);
+        console.error('🚨 Error al conectar con la base de datos:', err.message);
     } else {
-        console.log('🗄️ Conectado a la base de datos SQLite');
+        console.log('🗄️ Conectado a la base de datos SQLite: database.sqlite');
     }
 });
+
+// Verificar si la tabla `payments` existe
+db.run(`
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fullName TEXT NOT NULL,
+        subscriptionType INTEGER NOT NULL,
+        paymentDate TEXT NOT NULL,
+        amount INTEGER DEFAULT 0,
+        extraNotes TEXT
+    )
+`, (err) => {
+    if (err) {
+        console.error("🚨 Error al crear/verificar la tabla `payments`:", err.message);
+    } else {
+        console.log("✅ Tabla `payments` verificada correctamente.");
+        
+        // Verificar si la columna `amount` existe en `payments`
+        db.all(`PRAGMA table_info(payments)`, (err, rows) => {
+            if (err) {
+                console.error("🚨 Error al verificar la estructura de `payments`:", err.message);
+                return;
+            }
+
+            if (!rows.some(row => row.name === 'amount')) {
+                console.log("⚠️ La columna `amount` no existe, agregándola...");
+                db.run(`ALTER TABLE payments ADD COLUMN amount INTEGER DEFAULT 0`, (err) => {
+                    if (err) {
+                        console.error("🚨 Error al agregar la columna `amount`:", err.message);
+                    } else {
+                        console.log("✅ Columna `amount` agregada correctamente.");
+                    }
+                });
+            } else {
+                console.log("✅ La columna `amount` ya existe.");
+            }
+        });
+    }
+});
+
+module.exports = db;
+
 
 // ✅ Middleware para autenticar el token
 function authenticateToken(req, res, next) {
@@ -126,56 +170,91 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/payments', authenticateToken, async (req, res) => {
-    console.log("📥 Recibida solicitud para agregar pago:", req.body);
-
-    const { fullName, subscriptionType, paymentDate, extraNotes } = req.body;
-
-    if (!fullName || !subscriptionType || !paymentDate) {
-        console.log("❌ Falta información en la solicitud:", req.body);
-        return res.status(400).json({ error: "Todos los campos son obligatorios." });
-    }
-
     try {
-        console.log("🗄️ Insertando en la base de datos...");
+        const { fullName, subscriptionType, paymentDate, amount } = req.body;
 
-        db.run(
-            "INSERT INTO payments (fullName, subscriptionType, paymentDate, extraNotes) VALUES (?, ?, ?, ?)",
-            [fullName, subscriptionType, paymentDate, extraNotes],
+        if (!fullName || !subscriptionType || !paymentDate || isNaN(amount)) {
+            return res.status(400).json({ error: "Todos los campos son obligatorios y el monto debe ser un número." });
+        }
+
+        await db.run(
+            `INSERT INTO payments (fullName, subscriptionType, paymentDate) VALUES (?, ?, ?)`,
+            [fullName, amount, paymentDate],
             function (err) {
                 if (err) {
-                    console.error("❌ Error al insertar en la BD:", err.message);
+                    console.error("🚨 Error al registrar el pago:", err.message);
                     return res.status(500).json({ error: "Error al registrar el pago." });
                 }
-
-                console.log(`✅ Pago guardado en la BD: ID=${this.lastID}, Nombre=${fullName}, Fecha de Pago=${paymentDate}`);
-                res.json({ success: true, id: this.lastID });
+                console.log("✅ Pago registrado con éxito. ID:", this.lastID);
+                res.status(201).json({ id: this.lastID, fullName, amount, paymentDate });
             }
         );
 
     } catch (error) {
-        console.error("🚨 Error en la inserción de pagos:", error.message);
-        res.status(500).json({ error: "Error interno del servidor" });
+        console.error("🚨 Error en el servidor:", error);
+        res.status(500).json({ error: "Error interno del servidor." });
     }
 });
 
 
+// 📌 Correcciones en server.js
 app.get('/api/payments', authenticateToken, (req, res) => {
-    db.all("SELECT amount FROM payments", [], (err, rows) => {
+    const today = new Date().toISOString().split('T')[0];
+
+    console.log("🔍 Consultando datos de pagos...");
+
+    const queryTotalIncome = `SELECT SUM(amount) AS totalIncome FROM payments`;
+    const queryTotalPayments = `SELECT COUNT(*) AS totalPayments FROM payments`;
+    const queryOverduePayments = `SELECT COUNT(*) AS overduePayments FROM payments WHERE DATE(paymentDate) < DATE(?)`;
+    const queryUpcomingPayments = `SELECT COUNT(*) AS upcomingPayments FROM payments WHERE DATE(paymentDate) BETWEEN DATE(?) AND DATE('now', '+7 days')`;
+
+    db.all(queryTotalIncome, [], (err, incomeResult) => {
         if (err) {
-            console.error("❌ Error al obtener pagos:", err.message);
-            return res.status(500).json({ error: "Error al obtener pagos" });
+            console.error("🚨 Error al calcular totalIncome:", err.message);
+            return res.status(500).json({ error: "Error al obtener total de ingresos." });
         }
+        console.log("✅ Total de ingresos:", incomeResult);
 
-        const totalIncome = rows.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-        console.log("✅ totalIncome calculado en backend:", totalIncome);
+        db.all(queryTotalPayments, [], (err, paymentsResult) => {
+            if (err) {
+                console.error("🚨 Error al contar totalPayments:", err.message);
+                return res.status(500).json({ error: "Error al obtener total de pagos." });
+            }
+            console.log("✅ Total de pagos:", paymentsResult);
 
-        res.json({
-            totalIncome,
-            overduePayments: 0,  // Si no los calculas, usa 0 para evitar errores
-            upcomingPayments: 0
+            db.all(queryOverduePayments, [today], (err, overdueResult) => {
+                if (err) {
+                    console.error("🚨 Error al contar pagos vencidos:", err.message);
+                    return res.status(500).json({ error: "Error al obtener pagos vencidos." });
+                }
+                console.log("✅ Pagos vencidos:", overdueResult);
+
+                db.all(queryUpcomingPayments, [today], (err, upcomingResult) => {
+                    if (err) {
+                        console.error("🚨 Error al contar pagos por vencer:", err.message);
+                        return res.status(500).json({ error: "Error al obtener pagos por vencer." });
+                    }
+                    console.log("✅ Pagos próximos a vencer:", upcomingResult);
+
+                    console.log("📡 Datos enviados al frontend:", {
+                        totalIncome: incomeResult[0]?.totalIncome || 0,
+                        totalPayments: paymentsResult[0]?.totalPayments || 0,
+                        overduePayments: overdueResult[0]?.overduePayments || 0,
+                        upcomingPayments: upcomingResult[0]?.upcomingPayments || 0
+                    });
+
+                    res.json({
+                        totalIncome: incomeResult[0]?.totalIncome || 0,
+                        totalPayments: paymentsResult[0]?.totalPayments || 0,
+                        overduePayments: overdueResult[0]?.overduePayments || 0,
+                        upcomingPayments: upcomingResult[0]?.upcomingPayments || 0
+                    });
+                });
+            });
         });
     });
 });
+
 
 
 

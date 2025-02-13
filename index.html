@@ -99,7 +99,7 @@
                 </tbody>
             </table>
             
-            <span id="totalIncomeAmount">$0</span>
+          
 
             <section id="clientPaymentsContainer">
                 <h3>Historial de Pagos</h3>
@@ -125,29 +125,26 @@
             <section class="mt-4">
                 <h3>Registrar Nuevo Pago</h3>
                 <form id="paymentForm">
-                    <div class="mb-3">
-                        <label for="fullName" class="form-label">Nombre y Apellido:</label>
-                        <input type="text" id="fullName" class="form-control" required>
-                    </div>
+                    <label for="fullName">Nombre y Apellido:</label>
+                    <input type="text" id="fullName" class="form-control" required>
                 
-                    <div class="mb-3">
-                        <label for="subscriptionType" class="form-label">Tipo de Abono:</label>
-                        <select id="subscriptionType" class="form-select" required>
-                            <option value="33500">Abono 1 - $33,500 (4 clases mensuales)</option>
-                            <option value="38500">Abono 2 - $38,500 (6 clases mensuales)</option>
-                            <option value="44000">Abono 3 - $44,000</option>
-                            <option value="8500">Clase Suelta - $8,500</option>
-                        </select>
-                    </div>
+                    <label for="subscriptionType">Tipo de Abono:</label>
+                    <select id="subscriptionType" class="form-select" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="33500">Abono 1 - $33,500 (4 clases mensuales)</option>
+                        <option value="38500">Abono 2 - $38,500 (6 clases mensuales)</option>
+                        <option value="44000">Abono 3 - $44,000</option>
+                        <option value="8500">Clase Suelta - $8,500</option>
+                    </select>
                 
-                    <div class="mb-3">
-                        <label for="paymentDate" class="form-label">Fecha de Pago:</label>
-                        <input type="date" id="paymentDate" class="form-control" required>
-
-                    </div>
+                    <label for="paymentDate">Fecha de Pago:</label>
+                    <input type="date" id="paymentDate" class="form-control" required>
+                
+                    <input type="hidden" id="amount" name="amount"> <!-- Campo oculto para el monto -->
                 
                     <button type="submit" class="btn btn-primary w-100">Registrar Pago</button>
                 </form>
+                
                 
                 
             </section>

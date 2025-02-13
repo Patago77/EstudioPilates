@@ -27,7 +27,6 @@ function getAuthHeaders() {
         "Authorization": `Bearer ${token}`
     };
 }
-
 // Mostrar/Ocultar Contenedores
 function toggleContainers(showApp) {
     const loginContainer = document.getElementById("loginContainer");
@@ -41,6 +40,7 @@ function toggleContainers(showApp) {
     }
 }
 
+// Verificar Autenticacion
 // Verificar Autenticacion
 async function checkAuth() {
     console.log("Iniciando verificación de autenticacion...");
@@ -171,6 +171,16 @@ if (loginForm) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("📌 DOM completamente cargado. Ejecutando checkAuth...");
+
+    checkAuth().then(isAuthenticated => { 
+        if (isAuthenticated) {
+            console.log("📌 Usuario autenticado, cargando dashboard...");
+            loadDashboard();
+        }
+    });
+
+    // Vincular el formulario de pagos
     const paymentForm = document.getElementById("paymentForm");
 
     if (paymentForm) {
@@ -179,18 +189,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const fullName = document.getElementById("fullName")?.value.trim();
             const subscriptionType = document.getElementById("subscriptionType")?.value.trim();
-            const paymentDate = document.getElementById("paymentDate")?.value.trim(); // Capturar fecha de pago
+            const paymentDate = document.getElementById("paymentDate")?.value.trim();
+            const amount = parseFloat(subscriptionType); // Se obtiene el monto desde el select
 
-            console.log("🔎 Valores capturados del formulario:", { fullName, subscriptionType, paymentDate });
+            console.log("🔎 Datos capturados del formulario:", { fullName, subscriptionType, paymentDate, amount });
 
-            if (!fullName || !subscriptionType || !paymentDate) {
-                console.warn("❌ Falta información en la solicitud.");
+            if (!fullName || !subscriptionType || !paymentDate || isNaN(amount) || amount <= 0) {
+                console.warn("❌ Falta información en el formulario.");
                 Swal.fire("Error", "Todos los campos son obligatorios.", "warning");
                 return;
             }
 
-            console.log("📤 Enviando datos del formulario:", { fullName, subscriptionType, paymentDate });
-            await savePayment(fullName, subscriptionType, paymentDate);
+            console.log("📤 Enviando datos del formulario:", { fullName, subscriptionType, paymentDate, amount });
+            await savePayment(fullName, subscriptionType, paymentDate, amount);
         });
 
         console.log("✅ Formulario de pagos vinculado correctamente.");
@@ -200,15 +211,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+async function savePayment() {
+    const fullName = document.getElementById("fullName")?.value.trim();
+    const subscriptionType = document.getElementById("subscriptionType")?.value.trim();
+    const paymentDate = document.getElementById("paymentDate")?.value.trim();
+    const amount = document.getElementById("amount")?.value.trim();
 
-async function savePayment(fullName, subscriptionType, amount) {
-    amount = parseFloat(amount); // Asegurar que amount sea un número
+    console.log("🔍 Valores capturados del formulario:", { fullName, subscriptionType, paymentDate, amount });
 
-    console.log("🔎 Valores antes de enviar:", { fullName, subscriptionType, amount });
-
-    if (!fullName || !subscriptionType || isNaN(amount) || amount <= 0) {
-        console.warn("❌ Falta información en la solicitud.");
-        Swal.fire("Error", "Todos los campos son obligatorios y el monto debe ser mayor a 0.", "warning");
+    if (!fullName || !subscriptionType || !paymentDate || !amount) {
+        console.warn("❌ Falta información en el formulario.");
+        Swal.fire("Error", "Todos los campos son obligatorios.", "warning");
         return;
     }
 
@@ -219,10 +232,10 @@ async function savePayment(fullName, subscriptionType, amount) {
                 "Content-Type": "application/json",
                 ...getAuthHeaders()
             },
-            body: JSON.stringify({ fullName, subscriptionType, amount }) // Enviando correctamente amount
+            body: JSON.stringify({ fullName, subscriptionType, paymentDate, amount })
         });
 
-        console.log("📡 Respuesta del servidor:", response.status, response.statusText);
+        console.log("📡 Respuesta del servidor:", response.status);
 
         if (!response.ok) {
             const errorData = await response.json();
@@ -231,7 +244,7 @@ async function savePayment(fullName, subscriptionType, amount) {
 
         console.log("✅ Pago guardado correctamente.");
         Swal.fire("Éxito", "Pago guardado correctamente.", "success").then(() => {
-            loadPayments();
+            loadPayments(); // Recargar lista de pagos
         });
 
     } catch (error) {
@@ -244,15 +257,30 @@ async function savePayment(fullName, subscriptionType, amount) {
 let totalIncome = 0; // Definimos la variable global
 async function loadPayments() {
     console.log("📊 Cargando pagos desde el backend...");
-    
+
+    const token = sessionStorage.getItem("token");
+
+    if (!token) {
+        console.warn("🚨 No hay token disponible. No se puede obtener pagos.");
+        return;  // ❌ Evita hacer la solicitud si no hay token
+    }
+
     try {
         const response = await fetch(`${API_URL}/payments`, {
             method: "GET",
-            headers: { ...getAuthHeaders() }
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
         });
 
+        if (response.status === 401) {
+            console.warn("🔴 No autorizado. El usuario debe iniciar sesión.");
+            return;
+        }
+
         if (!response.ok) {
-            throw new Error("Error al obtener pagos");
+            throw new Error(`Error al obtener pagos. Código: ${response.status}`);
         }
 
         // ✅ Extraer correctamente los valores del backend
@@ -260,14 +288,20 @@ async function loadPayments() {
         console.log("✅ Datos obtenidos del backend:", { totalIncome, overduePayments, upcomingPayments });
 
         // ✅ Buscar el elemento correcto para totalIncome
-        const totalIncomeElement = document.getElementById("totalIncome") || document.getElementById("totalIncomeAmount");
+        const totalIncomeElement = document.getElementById("totalIncomeAmount");
 
         if (!totalIncomeElement) {
             console.error("⚠️ No se encontró el elemento donde actualizar totalIncome.");
             return;
         }
 
-        // ✅ Actualizar el total de ingresos
+        // ✅ Validar que totalIncome sea un número antes de actualizarlo
+        if (typeof totalIncome !== "number") {
+            console.error("🚨 Error: totalIncome no es un número válido:", totalIncome);
+            return;
+        }
+
+        // ✅ Actualizar el total de ingresos en el Dashboard
         totalIncomeElement.textContent = totalIncome.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
 
         console.log("✅ totalIncome actualizado correctamente:", totalIncomeElement.textContent);
@@ -276,6 +310,7 @@ async function loadPayments() {
         console.error("🚨 Error al cargar pagos:", error.message);
     }
 }
+
 
 
 // ✅ Evento en el formulario de búsqueda de pagos
@@ -311,43 +346,37 @@ document.getElementById("clientSearchForm")?.addEventListener("submit", async (e
         handleError(error);
     }
 });
-async function loadPayments() {
-    console.log("📊 Cargando pagos desde el backend...");
-    
-    try {
-        const response = await fetch(`${API_URL}/payments`, {
-            method: "GET",
-            headers: { ...getAuthHeaders() }
-        });
 
-        if (!response.ok) {
-            throw new Error(`Error al obtener pagos. Código: ${response.status}`);
-        }
 
-        const data = await response.json();
-        console.log("🔍 Datos recibidos del backend:", data);
-
-        // Verifica que totalIncome existe antes de usarlo
-        if (!("totalIncome" in data)) {
-            throw new Error("totalIncome no está presente en la respuesta del servidor");
-        }
-
-        // ✅ Actualizar la UI con los datos obtenidos
-        const totalIncomeElement = document.getElementById("totalIncomeAmount");
-
-        if (totalIncomeElement) {
-            totalIncomeElement.textContent = data.totalIncome.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
-            console.log("✅ totalIncome actualizado:", totalIncomeElement.textContent);
-        } else {
-            console.error("⚠️ No se encontró el elemento donde actualizar totalIncome.");
-        }
-    } catch (error) {
-        console.error("🚨 Error al cargar pagos:", error.message);
-    }
-}
 // ✅ Ejecutar `loadPayments()` automáticamente cuando se cargue la página
 document.addEventListener("DOMContentLoaded", () => {
-    loadPayments();
+    const paymentForm = document.getElementById("paymentForm");
+
+    if (paymentForm) {
+        paymentForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const fullName = document.getElementById("fullName")?.value.trim();
+            const subscriptionType = document.getElementById("subscriptionType")?.value.trim();
+            const paymentDate = document.getElementById("paymentDate")?.value.trim();
+            const amount = parseFloat(subscriptionType); // 🔹 Capturar el monto desde el select
+
+            console.log("🔎 Valores capturados del formulario:", { fullName, subscriptionType, paymentDate, amount });
+
+            if (!fullName || !subscriptionType || !paymentDate || isNaN(amount) || amount <= 0) {
+                console.warn("❌ Falta información en la solicitud.");
+                Swal.fire("Error", "Todos los campos son obligatorios.", "warning");
+                return;
+            }
+
+            console.log("📤 Enviando datos del formulario:", { fullName, subscriptionType, paymentDate, amount });
+            await savePayment(fullName, subscriptionType, paymentDate, amount);
+        });
+
+        console.log("✅ Formulario de pagos vinculado correctamente.");
+    } else {
+        console.warn("⚠️ No se encontró el formulario de pagos.");
+    }
 });
 
 
@@ -418,31 +447,57 @@ function updatePaymentsTable(payments) {
 
 // ✅ Cargar Dashboard
 async function loadDashboard() {
+    console.log("📊 Cargando información del Dashboard...");
+
+    const token = sessionStorage.getItem("token");
+
+    if (!token) {
+        console.warn("🚨 No hay token disponible. No se puede cargar el Dashboard.");
+        return;
+    }
+
     try {
-        console.log("📊 Cargando dashboard...");
+        const response = await fetch(`${API_URL}/payments`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
 
-        const totalIncomeElement = document.getElementById("totalIncomeAmount");
-
-        if (!totalIncomeElement) {
-            console.warn("⚠️ Elemento 'totalIncomeAmount' no encontrado en el DOM.");
-        } else {
-            totalIncomeElement.textContent = totalIncome.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
-            console.log("✅ totalIncomeAmount actualizado correctamente.");
+        if (!response.ok) {
+            throw new Error(`Error al obtener datos del Dashboard. Código: ${response.status}`);
         }
 
+        const { totalIncome, overduePayments, upcomingPayments } = await response.json();
+        console.log("✅ Datos obtenidos del backend:", { totalIncome, overduePayments, upcomingPayments });
+
+        // Actualizar Total de Ingresos
+        const totalIncomeElement = document.getElementById("totalIncomeAmount");
+        if (totalIncomeElement) {
+            totalIncomeElement.textContent = totalIncome.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
+        } else {
+            console.error("⚠️ No se encontró el elemento para mostrar totalIncome.");
+        }
+
+        // Actualizar Pagos Vencidos
+        const overduePaymentsElement = document.getElementById("overduePaymentsCount");
+        if (overduePaymentsElement) {
+            overduePaymentsElement.textContent = overduePayments;
+        } else {
+            console.error("⚠️ No se encontró el elemento para mostrar pagos vencidos.");
+        }
+
+        // Actualizar Pagos Por Vencer
+        const upcomingPaymentsElement = document.getElementById("upcomingPaymentsCount");
+        if (upcomingPaymentsElement) {
+            upcomingPaymentsElement.textContent = upcomingPayments;
+        } else {
+            console.error("⚠️ No se encontró el elemento para mostrar pagos por vencer.");
+        }
+
+        console.log("✅ Dashboard actualizado correctamente.");
+
     } catch (error) {
-        console.error("🚨 Error en loadDashboard:", error);
-        handleError(error);
+        console.error("🚨 Error al cargar el Dashboard:", error.message);
     }
-}
-
-
-const totalIncomeElement = document.getElementById("totalIncome") || document.getElementById("totalIncomeAmount");
-if (totalIncomeElement) {
-    totalIncomeElement.textContent = totalIncome.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
-    console.log("✅ totalIncome actualizado en:", totalIncomeElement);
-} else {
-    console.error("⚠️ No se encontró el elemento para mostrar totalIncome.");
 }
 
 
