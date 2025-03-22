@@ -7,21 +7,81 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        .table-responsive { overflow-x: auto; }
-        #appContainer { display: none; }
-        .dashboard .card {
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            width: 30%;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin: 10px;
-            cursor: pointer;
-        }
-        .dashboard .card h3 { font-size: 1.2rem; margin-bottom: 10px; }
-        .dashboard .card p { font-size: 1.5rem; font-weight: bold; }
+       .table-responsive {
+    overflow-x: auto;
+}
+#appContainer {
+    display: none;
+}
+
+/* Estilos para las tarjetas del Dashboard */
+.dashboard .card {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    width: 30%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin: 10px;
+    cursor: pointer;
+}
+
+/* Estilos para títulos y números en las tarjetas */
+.dashboard .card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+.dashboard .card p {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* 🔹 Asegurar que las listas sean visibles */
+#overduePaymentsList, #upcomingPaymentsList {
+    list-style-type: none;  /* Eliminar viñetas */
+    padding: 0;
+    margin: 10px 0;
+    font-size: 1.1rem;
+    color: #333; /* Color de texto oscuro para mejor visibilidad */
+}
+
+/* Estilos específicos para cada tipo de lista */
+#overduePaymentsList li {
+    background-color: #ffcccc; /* 🔴 Fondo rojo claro para pagos vencidos */
+    padding: 5px;
+    margin: 5px 0;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+#upcomingPaymentsList li {
+    background-color: #ccffcc; /* 🟢 Fondo verde claro para próximos pagos */
+    padding: 5px;
+    margin: 5px 0;
+    border-radius: 5px;
+    font-weight: bold;
+}
+/* Mejorar la legibilidad de la tabla de ingresos */
+.table-responsive {
+    margin-top: 20px;
+}
+
+.table thead {
+    background-color: #343a40; /* Encabezado oscuro */
+    color: white;
+}
+
+.table td {
+    font-size: 1.2rem;
+    padding: 10px;
+}
+
+.text-success {
+    color: #28a745 !important; /* Verde para resaltar ingresos */
+}
+
+
     </style>
 </head>
 <body>
@@ -54,19 +114,41 @@
             <section id="dashboardContainer" class="my-4 text-center">
                 <h2>Dashboard Informativo</h2>
 
+                <h3>Pagos vencidos (<span id="overduePaymentsCount">0</span>)</h3>
+<ul id="overduePaymentsList"></ul> <!-- ✅ Aquí se mostrarán los pagos vencidos -->
+
+<h3>Pagos próximos a vencer (<span id="upcomingPaymentsCount">0</span>)</h3>
+<ul id="upcomingPaymentsList"></ul> <!-- ✅ Aquí se mostrarán los próximos pagos -->
+
+
                 <div class="container mt-4">
-                    <h3>Total de Ingresos</h3>
+                   
                     <table class="table table-bordered">
                         <thead>
-                            <tr>
-                                <th>Total de Pagos</th>
-                                <th>Total Ingresos ($)</th>
+                            <tr><h3>Ingresos Totales por Mes</h3>
+                                <h3 class="mt-4 text-center">📅 Ingresos Totales por Mes</h3>
+
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped text-center">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Mes</th>
+                                                <h4>Total meses anteriores: <span id="pastMonthsTotal">0</span></h4>
+
+                                                <th>Ingresos Totales ($)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="monthlyIncomeTableBody"></tbody>
+                                    </table>
+                                </div>
+                                
+                               
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
+                            <tr> 
                                 <td id="totalPayments">0</td>
-                                <td id="totalIncomeAmount" style="display: block;">$0</td>
+                             
                             </tr>
                         </tbody>
                     </table>
@@ -74,12 +156,10 @@
                 
                 <div class="dashboard d-flex justify-content-around flex-wrap">
                     <div id="overduePayments" class="card">
-                        <h3>Pagos Vencidos</h3>
-                        <p id="overduePaymentsCount">0</p>
-                    </div>
-                    <div id="upcomingPayments" class="card">
-                        <h3>Pagos Próximos a Vencer</h3>
-                        <p id="upcomingPaymentsCount">0</p>
+                        <h2>Total de Ingresos: <span id="totalIncomeAmount">0</span></h2>
+
+                       
+                        
                     </div>
                 </div>
             </section>
@@ -129,7 +209,7 @@
                     <input type="text" id="fullName" class="form-control" required>
                 
                     <label for="subscriptionType">Tipo de Abono:</label>
-                    <select id="subscriptionType" class="form-select" required>
+                    <select id="subscriptionType" class="form-select" required onchange="updateAmount()">
                         <option value="">Selecciona una opción</option>
                         <option value="33500">Abono 1 - $33,500 (4 clases mensuales)</option>
                         <option value="38500">Abono 2 - $38,500 (6 clases mensuales)</option>
