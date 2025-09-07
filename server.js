@@ -2,239 +2,190 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const sqlite3 = require('sqlite3').verbose();
 const dotenv = require('dotenv');
-const { body, validationResult } = require('express-validator'); // ✅ Importación correcta
-const paymentsRouter = require('./routes/payments');
 
-dotenv.config(); // Cargar variables de entorno
+const { body, validationResult } = require('express-validator');
+
+// Importación de rutas
+const paymentsRouter = require('./routes/payments'); // Mantenido
+const gastosRouter = require('./routes/gastos');     // Mantenido
+const studentsRouter = require('./routes/students');
+
+
+const db = require('./db'); // Conexión a la base de datos
+
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Verificación de SECRET_KEY
 if (!process.env.SECRET_KEY) {
-    console.error("❌ ERROR: SECRET_KEY no está definida en .env");
-    process.exit(1);
+  console.error("❌ ERROR: SECRET_KEY no está definida en .env");
+  process.exit(1);
 }
 const SECRET_KEY = process.env.SECRET_KEY;
 console.log("🔑 Clave secreta cargada:", SECRET_KEY);
 
-// ✅ Middleware
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+app.use('/api', paymentsRouter);
+app.use('/api', gastosRouter);
+app.use('/api', studentsRouter);   // <--- ¡AHORA SÍ!
 
-// ✅ Base de Datos SQLite
-const db = new sqlite3.Database('./database.sqlite', (err) => {
-    if (err) {
-        console.error('🚨 Error al conectar con la base de datos:', err.message);
-    } else {
-        console.log('🗄️ Conectado a la base de datos SQLite: database.sqlite');
-    }
-});
 
-// ✅ Verificar si la tabla `payments` existe
-db.run(`
-    CREATE TABLE IF NOT EXISTS payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fullName TEXT NOT NULL,
-        subscriptionType INTEGER NOT NULL,
-        paymentDate TEXT NOT NULL,
-        amount INTEGER DEFAULT 0,
-        extraNotes TEXT
-    )
-`, (err) => {
-    if (err) {
-        console.error("🚨 Error al crear/verificar la tabla `payments`:", err.message);
-    } else {
-        console.log("✅ Tabla `payments` verificada correctamente.");
-    }
-});
 
-// ✅ Middleware para autenticar el token
+// Middleware de autenticación JWT
 function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Token no proporcionado o formato incorrecto' });
-    }
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
 
-    const token = authHeader.split(' ')[1];
-
-    jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) {
-            return res.status(403).json({ error: 'Token inválido o expirado' });
-        }
-        req.user = user;
-        next();
-    });
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token inválido o expirado' });
+    req.user = user;
+    next();
+  });
 }
 
-// ✅ Ruta para iniciar sesión
-app.post('/api/login',
-    [
-        body('username').trim().notEmpty().withMessage('El usuario es obligatorio.'),
-        body('password').notEmpty().withMessage('La contraseña es obligatoria.')
-    ],
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { username, password } = req.body;
-        if (!username || !password) {
-            return res.status(400).json({ error: "Usuario y contraseña requeridos" });
-        }
-
-        try {
-            const user = await new Promise((resolve, reject) => {
-                db.get('SELECT id, username, password FROM users WHERE username = ?', [username], (err, row) => {
-                    if (err) reject(err);
-                    resolve(row);
-                });
-            });
-
-            if (!user || !(await bcrypt.compare(password, user.password))) {
-                return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
-            }
-
-            const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '7d' });
-            res.json({ token });
-        } catch (error) {
-            res.status(500).json({ error: "Error interno del servidor" });
-        }
-    }
-);
-
-app.post('/api/payments',
-    authenticateToken,
-    [
-        body('fullName').trim().notEmpty().withMessage('El nombre es obligatorio.'),
-        body('subscriptionType').isInt().withMessage('El tipo de suscripción debe ser un número.'),
-        body('paymentDate').isISO8601().withMessage('Fecha inválida.'),
-        body('amount').isFloat({ gt: 0 }).withMessage('El monto debe ser mayor a 0.')
-    ],
-    (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            console.error("❌ Error de validación:", errors.array());
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { fullName, subscriptionType, paymentDate, amount } = req.body;
-
-        // ✅ Asegurar que el monto no sea null ni undefined
-        if (!fullName || !subscriptionType || !paymentDate || amount === undefined || isNaN(amount) || amount <= 0) {
-            console.error("🚨 Error: Falta información en la solicitud:", req.body);
-            return res.status(400).json({ error: "Todos los campos son obligatorios y el monto debe ser un número válido." });
-        }
-
-        console.log("📤 Guardando pago en la base de datos:", { fullName, subscriptionType, paymentDate, amount });
-
-        db.run(
-            `INSERT INTO payments (fullName, subscriptionType, paymentDate, amount) VALUES (?, ?, ?, ?)`,
-            [fullName, subscriptionType, paymentDate, amount],
-            function (err) {
-                if (err) {
-                    console.error("❌ Error al guardar pago en la base de datos:", err.message);
-                    return res.status(500).json({ error: "Error al registrar el pago." });
-                }
-                console.log("✅ Pago registrado correctamente.");
-                res.status(201).json({ id: this.lastID, fullName, amount, paymentDate });
-            }
-        );
-    }
-);
-
-
-// ✅ Ruta para obtener información del Dashboard
-app.get('/api/dashboard', authenticateToken, (req, res) => {
-    const today = new Date().toISOString().split('T')[0];
-    const upcomingDate = new Date();
-    upcomingDate.setDate(upcomingDate.getDate() + 7);
-    const upcomingDateString = upcomingDate.toISOString().split('T')[0];
-
-    console.log("🔍 Consultando datos del Dashboard...");
-
-    // 🔹 Consultas SQL
-    const queryTotalIncome = `SELECT COALESCE(SUM(amount), 0) AS totalIncome FROM payments`;
-    const queryTotalPayments = `SELECT COUNT(*) AS totalPayments FROM payments`;
-    const queryPaymentsPerMonth = `
-    SELECT strftime('%Y-%m', paymentDate) AS month, SUM(amount) AS totalIncome
-    FROM payments
-    GROUP BY month
-    ORDER BY month DESC
-`;
-
-        
-    const queryOverduePayments = `SELECT DISTINCT fullName FROM payments WHERE paymentDate < ? ORDER BY paymentDate DESC LIMIT 100`;
-    const queryUpcomingPayments = `SELECT DISTINCT fullName FROM payments WHERE paymentDate BETWEEN ? AND ? ORDER BY paymentDate ASC LIMIT 100`;
-
-    // 🔹 Obtener total de ingresos
-    db.get(queryTotalIncome, [], (err, totalIncomeRow) => {
-        if (err) {
-            console.error("🚨 Error al obtener ingresos totales:", err.message);
-            return res.status(500).json({ error: "Error al obtener ingresos totales." });
-        }
-        const totalIncome = Number(totalIncomeRow?.totalIncome) || 0;
-
-        // 🔹 Obtener total de pagos
-        db.get(queryTotalPayments, [], (err, totalPaymentsRow) => {
-            if (err) {
-                console.error("🚨 Error al obtener total de pagos:", err.message);
-                return res.status(500).json({ error: "Error al obtener total de pagos." });
-            }
-            const totalPayments = totalPaymentsRow?.totalPayments || 0;
-
-            // 🔹 Obtener pagos por mes
-            db.all(queryPaymentsPerMonth, [], (err, paymentsPerMonth) => {
-                if (err) {
-                    console.error("🚨 Error al obtener pagos por mes:", err.message);
-                    return res.status(500).json({ error: "Error al obtener pagos por mes." });
-                }
-
-                // 🔹 Obtener pagos vencidos
-                db.all(queryOverduePayments, [today], (err, overduePaymentsRows) => {
-                    if (err) {
-                        console.error("🚨 Error al obtener pagos vencidos:", err.message);
-                        return res.status(500).json({ error: "Error al obtener pagos vencidos." });
-                    }
-                    const overduePayments = overduePaymentsRows.map(row => row.fullName) ?? [];
-
-                    // 🔹 Obtener pagos próximos
-                    db.all(queryUpcomingPayments, [today, upcomingDateString], (err, upcomingPaymentsRows) => {
-                        if (err) {
-                            console.error("🚨 Error al obtener pagos próximos a vencer:", err.message);
-                            return res.status(500).json({ error: "Error al obtener pagos próximos a vencer." });
-                        }
-                        const upcomingPayments = upcomingPaymentsRows.map(row => row.fullName) ?? [];
-
-                        // ✅ Enviar respuesta al frontend
-                        res.json({ 
-                            totalIncome, 
-                            totalPayments, 
-                            paymentsPerMonth, 
-                            overduePayments, 
-                            upcomingPayments 
-                        });
-                    });
-                });
-            });
-        });
-    });
-});
-
-
-// ✅ Ruta de prueba
+// Ruta de prueba
 app.get('/api/test', (req, res) => {
-    res.json({ message: "✅ El servidor responde correctamente." });
+  res.json({ message: "✅ El servidor responde correctamente." });
 });
 
-// ✅ Usar `paymentsRouter`
-app.use('/api', paymentsRouter);
+// Ruta de login
+app.post('/api/login',
+  [
+    body('email').trim().notEmpty().withMessage('El email es obligatorio.'),
+    body('password').notEmpty().withMessage('La contraseña es obligatoria.')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-// ✅ Iniciar el servidor
+    const { email, password } = req.body;
+
+    try {
+      const [rows] = await db.query('SELECT id, email, password_hash FROM users WHERE email = ?', [email]);
+      const user = rows[0];
+
+      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+      }
+
+      const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: '7d' });
+      res.json({ token });
+    } catch (error) {
+      console.error("❌ Error en el login:", error.message);
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
+  }
+);
+
+// Ruta del Dashboard (ingresos y pagos vencidos)
+app.get('/api/dashboard', authenticateToken, async (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const upcomingDate = new Date();
+  upcomingDate.setDate(upcomingDate.getDate() + 7);
+  const upcomingDateStr = upcomingDate.toISOString().split('T')[0];
+
+  try {
+    const [[totalIncomeRow]] = await db.query('SELECT COALESCE(SUM(amount), 0) AS totalIncome FROM payments');
+    const [[totalPaymentsRow]] = await db.query('SELECT COUNT(*) AS totalPayments FROM payments');
+    const [paymentsPerMonth] = await db.query(`
+      SELECT DATE_FORMAT(paymentDate, '%Y-%m') AS month, SUM(amount) AS totalIncome
+      FROM payments
+      GROUP BY month
+      ORDER BY month DESC
+    `);
+
+    const [overduePaymentsRows] = await db.query(
+      'SELECT DISTINCT fullName FROM payments WHERE paymentDate < ? ORDER BY paymentDate DESC LIMIT 100',
+      [today]
+    );
+
+    const [upcomingPaymentsRows] = await db.query(
+      'SELECT DISTINCT fullName FROM payments WHERE paymentDate BETWEEN ? AND ? ORDER BY paymentDate ASC LIMIT 100',
+      [today, upcomingDateStr]
+    );
+
+    res.json({
+      totalIncome: Number(totalIncomeRow.totalIncome) || 0,
+      totalPayments: totalPaymentsRow.totalPayments || 0,
+      paymentsPerMonth,
+      overduePayments: overduePaymentsRows.map(r => r.fullName),
+      upcomingPayments: upcomingPaymentsRows.map(r => r.fullName)
+    });
+  } catch (err) {
+    console.error("❌ Error en el dashboard:", err.message);
+    res.status(500).json({ error: "Error en el dashboard" });
+  }
+});
+
+// 👩‍🎓 Obtener todos los alumnos (students)
+app.get('/api/students', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM students ORDER BY nombre ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error al obtener alumnos:", err.message);
+    res.status(500).json({ error: "Error al obtener alumnos" });
+  }
+});
+
+
+
+// Inicio del servidor
 app.listen(port, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
+});
+
+app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.query('SELECT * FROM gastos WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: "Gasto no encontrado" });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener el gasto" });
+  }
+});
+
+
+
+app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { fecha, categoria, descripcion, monto } = req.body;
+
+  if (!fecha || !categoria || !descripcion || isNaN(monto)) {
+    return res.status(400).json({ error: "Datos inválidos" });
+  }
+
+  try {
+    await db.query(
+      'UPDATE gastos SET fecha = ?, categoria = ?, descripcion = ?, monto = ? WHERE id = ?',
+      [fecha, categoria, descripcion, monto, id]
+    );
+    res.json({ message: "Gasto actualizado correctamente" });
+  } catch (err) {
+    res.status(500).json({ error: "Error al actualizar el gasto" });
+  }
+});
+
+
+
+app.delete('/api/gastos/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM gastos WHERE id = ?', [id]);
+    res.json({ message: "Gasto eliminado correctamente" });
+  } catch (err) {
+    res.status(500).json({ error: "Error al eliminar el gasto" });
+  }
 });
